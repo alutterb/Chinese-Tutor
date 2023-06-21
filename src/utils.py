@@ -1,14 +1,8 @@
 import os
-import jieba
-from io import StringIO
+import fitz
 from dotenv import load_dotenv
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.pdfpage import PDFPage
-from pdfminer.pdfparser import PDFParser
-import textdistance
+import pygtrie
+import re
 
 load_dotenv()
 
@@ -16,40 +10,62 @@ TEXTBOOK_PDF_PATH = os.getenv('TEXTBOOK_PDF_PATH')
 TEXTBOOK_TXT_PATH = os.getenv('TEXTBOOK_TXT_PATH')
 PINYIN_PATH = os.getenv('PINYIN_PATH')
 
-def load_pinyin():
+def is_chinese_char(char):
+    """Check if char is Chinese character."""
+    return '\u4e00' <= char <= '\u9fff'
+
+def is_pinyin_word(word):
+    """Check if word is pinyin word by checking if it contains only latin characters and tones."""
+    return bool(re.match("^[a-zāēīōūǖáéíóúǘǎěǐǒǔǚàèìòùǜ]*$", word))
+
+def load_pinyin_trie():
+    trie = pygtrie.CharTrie()
     with open(PINYIN_PATH) as file:
-        words = file.readlines()
-    words = [word.strip() for word in words]
-    return words
+        for word in file:
+            word = word.strip()
+            trie[word] = word
+    return trie
 
-def pinyin_match(pinyin, correct_pinyins):
-    lev = textdistance.Levenshtein()
-    closest_pinyin = min(correct_pinyins, key=lambda correct_pinyin: lev.distance(pinyin, correct_pinyin))
-    return closest_pinyin
+def pinyin_match_trie(pinyin, correct_pinyins_trie):
+    # checks word in trie with longest matching prefix with the supplied pinyin word
+    match = correct_pinyins_trie.longest_prefix(pinyin)
+    if match:
+        return match.value
+    else:
+        return pinyin
 
-def create_text_from_pdf():
-    output_string = StringIO()
-    correct_pinyins = load_pinyin()
+def process_text(text, correct_pinyins):
+    words = text.split()
+    processed_words = []
+    for word in words:
+        if all(is_chinese_char(char) for char in word):
+            processed_words.append(word) # ignore chinese characters for now
+        elif is_pinyin_word(word): 
+            corrected_pinyin = pinyin_match_trie(word, correct_pinyins)
+            processed_words.append(corrected_pinyin)
+        else:
+            processed_words.append(word)
+    return ' '.join(processed_words)
 
+
+def extract_and_process_text_from_pdf():
+    correct_pinyins = load_pinyin_trie()
     try:
-        with open(TEXTBOOK_PDF_PATH, "rb") as f:
-            parser = PDFParser(f)
-            doc = PDFDocument(parser)
-            rsrcmgr = PDFResourceManager()
-            laparams = LAParams(char_margin=1.0, line_margin=0.5, detect_vertical=True)
-            device = TextConverter(rsrcmgr, output_string, laparams=laparams)
-            interpreter = PDFPageInterpreter(rsrcmgr, device)
+        if not os.path.exists(TEXTBOOK_PDF_PATH):
+            print(f"File not found: {TEXTBOOK_PDF_PATH}")
+            return
 
-            for page in PDFPage.create_pages(doc):
-                interpreter.process_page(page)
-
-        text = output_string.getvalue()
-        seg_list = jieba.cut(text, cut_all=False)
-        seg_list = [pinyin_match(pinyin, correct_pinyins=correct_pinyins) for pinyin in seg_list]
-        seg_text = " ".join(seg_list)
-
+        doc = fitz.open(TEXTBOOK_PDF_PATH)
+        all_text = ''
+        for page in doc:
+            text = page.get_text("text")
+            print(text)
+            #processed_text = process_text(text, correct_pinyins)
+            all_text += text + '\n'
+        
+        # save all text to a txt file.
         with open(TEXTBOOK_TXT_PATH, 'w', encoding='utf-8') as f:
-            f.write(seg_text)
+            f.write(all_text)
 
         print(f"Text successfully written to: {TEXTBOOK_TXT_PATH}")
 
@@ -58,4 +74,4 @@ def create_text_from_pdf():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-create_text_from_pdf()
+extract_and_process_text_from_pdf()
