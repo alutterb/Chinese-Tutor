@@ -1,5 +1,7 @@
 import os
-import fitz
+import pytesseract
+from PIL import Image
+import pdf2image
 from dotenv import load_dotenv
 import pygtrie
 import re
@@ -54,12 +56,13 @@ def extract_and_process_text_from_pdf():
         if not os.path.exists(TEXTBOOK_PDF_PATH):
             print(f"File not found: {TEXTBOOK_PDF_PATH}")
             return
-
-        doc = fitz.open(TEXTBOOK_PDF_PATH)
+        
+        print("Converting images..")
+        images = pdf2image.convert_from_path(TEXTBOOK_PDF_PATH)
         all_text = ''
-        for page in doc:
-            text = page.get_text("text")
-            print(text)
+        print("processing text...")
+        for image in images:
+            text = pytesseract.image_to_string(image)
             #processed_text = process_text(text, correct_pinyins)
             all_text += text + '\n'
         
