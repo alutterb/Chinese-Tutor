@@ -8,6 +8,8 @@ import re
 
 load_dotenv()
 
+# =======================  TEXT EXTRACTION ===================== #
+
 TEXTBOOK_PDF_PATH = os.getenv('TEXTBOOK_PDF_PATH')
 TEXTBOOK_TXT_PATH = os.getenv('TEXTBOOK_TXT_PATH')
 PINYIN_PATH = os.getenv('PINYIN_PATH')
@@ -18,7 +20,7 @@ def is_chinese_char(char):
 
 def is_pinyin_word(word):
     """Check if word is pinyin word by checking if it contains only latin characters and tones."""
-    return bool(re.match("^[a-zāēīōūǖáéíóúǘǎěǐǒǔǚàèìòùǜ]*$", word))
+    return bool(re.match(r'[a-zA-Z]*[āēīōūǖĀĒĪŌŪǕáéíóúǘÁÉÍÓÚǗǎěǐǒǔǚǍĚǏǑǓǙàèìòùǜÀÈÌÒÙǛ][a-zA-Z]*', word))
 
 def load_pinyin_trie():
     trie = pygtrie.CharTrie()
@@ -36,8 +38,8 @@ def pinyin_match_trie(pinyin, correct_pinyins_trie):
     else:
         return pinyin
 
-def process_text(text, correct_pinyins):
-    words = text.split()
+def process_text(input_text, correct_pinyins):
+    words = input_text.split()
     processed_words = []
     for word in words:
         if all(is_chinese_char(char) for char in word):
@@ -46,7 +48,7 @@ def process_text(text, correct_pinyins):
             corrected_pinyin = pinyin_match_trie(word, correct_pinyins)
             processed_words.append(corrected_pinyin)
         else:
-            processed_words.append(word)
+            processed_words.append(word) # also just append regular english words
     return ' '.join(processed_words)
 
 
@@ -63,8 +65,9 @@ def extract_and_process_text_from_pdf():
         print("processing text...")
         for image in images:
             text = pytesseract.image_to_string(image)
-            #processed_text = process_text(text, correct_pinyins)
-            all_text += text + '\n'
+            processed_text = process_text(text, correct_pinyins)
+            all_text += processed_text
+        
         
         # save all text to a txt file.
         with open(TEXTBOOK_TXT_PATH, 'w', encoding='utf-8') as f:
@@ -77,4 +80,4 @@ def extract_and_process_text_from_pdf():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
-extract_and_process_text_from_pdf()
+# ========================================================================
