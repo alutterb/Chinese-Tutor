@@ -1,3 +1,3 @@
 '''
-Preprocesses extracted text into tokens to be fed on LLM
+Preprocesses extracted text into tokens to be fed to LLM
 '''
