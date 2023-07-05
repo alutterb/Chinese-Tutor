@@ -1,1 +1,1 @@
-Thanks to this repo: https://github.com/KobeCofini/MonkeytypePinyin for supplying pinyin data.
+Goal: Train a specialized LLM on my Chinese textbook to aid in my studies.
