@@ -9,10 +9,6 @@ load_dotenv()
 MAX_TOKENS = 2000
 
 # =======================  TEXT EXTRACTION ===================== #
-'''
-Converts the textbook pdf into images, and then uses an ocr scanner
-to extract the text
-'''
 
 # Paths to pdf input and text output
 TEXTBOOK_PDF_PATH = os.getenv('TEXTBOOK_PDF_PATH')
@@ -99,6 +95,14 @@ def write_pdf_to_text():
         print(f"An unexpected error occurred: {e}")
 # ========================================================================
 
+
+# ======================== Helper Functions ==============================
+
+# read txt file and return text
+def read_text_from_txt(txt_path):
+    with open(txt_path, 'r') as f:
+        text = f.read()
+    return text
     
     
 
