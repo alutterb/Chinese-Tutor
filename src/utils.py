@@ -1,5 +1,6 @@
 import os
 import pdfplumber
+import pickle
 from dotenv import load_dotenv
 import openai
 
