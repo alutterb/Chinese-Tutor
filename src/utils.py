@@ -122,9 +122,7 @@ def write_pdf_to_pickle():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 # ========================================================================
-write_pdf_to_pickle()
 
-# ======================== Helper Functions ==============================
     
     
 
