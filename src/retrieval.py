@@ -12,59 +12,84 @@ import pinecone
 from tqdm.auto import tqdm # smart progress bar
 from uuid import uuid4 # unique identifiers for indexing
 
-import os
-from dotenv import load_dotenv
+class RetrievalAugmentationQA:
+    def __init__(self, index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
+        self.index_name = index_name
+        self.openai_key = openai_key
+        self.pinecone_key = pinecone_key
+        self.pinecone_env = pinecone_env
+        self.data = data
 
-# load environment variables
-load_dotenv()
-TEXTBOOK_TXT_PATH = os.getenv('TEXTBOOK_TXT_PATH')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-PINECONE_ENVIRONMENT = os.getenv('PINECONE_ENVIRONMENT')
-# Hyperparameters
-CHUNK_SIZE = 400 # # tokens per chunk
-CHUNK_OVERLAP = 20 # # tokens overlap
-EMBED_DIM = 1536 # dimension of embeddings
+        # setup OpenAI embeddings
+        print("Creating OpenAI Embeddings model...")
+        self.embed = OpenAIEmbeddings(model='text-embedding-ada-002')
+        self.res = self.embed.embed_documents(self.data['TEXT'])
+        # setup Pinecone index
+        print("Creating Pinecone index...")
+        pinecone.init(api_key=self.pinecone_key, environment=self.pinecone_env)
+        if self.index_name not in pinecone.list_indexes():
+            # create new index
+            pinecone.create_index(name=self.index_name, 
+                                  metric='cosine', 
+                                  dimension=len(self.res[0])
+                                )
 
-# initialize tokenizer
-tiktoken.encoding_for_model('gpt-3.5-turbo')
-tokenizer = tiktoken.get_encoding('cl100k_base')
-
-# create length function
-def tiktoken_len(text):
-    tokens = tokenizer.encode(
-        text,
-        disallowed_special=()
-    )
-    return len(tokens)
-
-# split text into chunks
-def split_text(text):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = CHUNK_SIZE,
-        chunk_overlap = CHUNK_OVERLAP,
-        length_function = tiktoken_len,
-        separators=["\n\n", "\n", " ", ""])
+        self.index = pinecone.GRPCIndex(self.index_name)
     
-    return text_splitter.split_text(text)
+    def add_to_index(self, batch_limit=100):
+        texts = []
+        metadatas = []
+        text_splitter = self._split_text()
 
-# build text embeddings
-def build_embeddings(model='gpt-3.5-turbo'):
-    embeddings = OpenAIEmbeddings(
-        model=model,
-        openai_api_key=OPENAI_API_KEY
-    )
-    return embeddings
+        for i, record in enumerate(tqdm(self.data)):
+            # acquire metadata from record
+            metadata = {
+                'PAGE': record['PAGE'],
+                'LESSON': record['LESSON']
+            }
 
-# initialize pinecone vector db and set up indexing
-def init_pinecone(index_name = 'langchain-retrieval-augmentation'):
-    pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
-    if index_name not in pinecone.list_indexes():
-        # we create a new index
-        pinecone.create_index(
-            name=index_name,
-            metric='cosine',
-            dimension=EMBED_DIM
+            # create chunks from record text
+            record_texts = text_splitter.split(record['TEXT'])
+            # create medadata dict for each chunk
+            record_metadatas=[{
+                "chunk":j, "text": text, **metadata
+            } for j, text in enumerate(record_texts)]
+            # append to current batch
+            texts.extend(record_texts)
+            metadatas.extend(record_metadatas)
+            # if batch limit reached, add text
+            if len(texts) >= batch_limit:
+                ids = [str(uuid4()) for _ in range(len(texts))]
+                embeds = self.embed.embed_documents(texts)
+                self.index.upsert(vectors=zip(ids, embeds, metadatas))
+                # reset batch
+                texts = []
+                metadatas = []
+
+        # add remaining texts
+        if len(texts) > 0:
+            ids = [str(uuid4()) for _ in range(len(texts))]
+            embeds = self.embed.embed_documents(texts)
+            self.index.upsert(vectors=zip(ids, embeds, metadatas))
+        print("All text successfully added to index.")
+    
+    # helper function to acquire tokenizer length
+    def _tiktoken_length(self, text):
+        tokenizer = tiktoken.get_encoding('cl100k_base')
+        tokens = tokenizer.encode(
+            text,
+            disallowed_special=()
         )
-    index = pinecone.GRPCIndex(index_name)
-    return index
+        return len(tokens)
+
+    # helper function to split text using langchain text splitter
+    def _split_text(self, chunk_size=400, chunk_overlap=20):
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_func=self._tiktoken_length,
+            separators=['\n\n','\n',' ', '']
+        )
+
+        return text_splitter
+    
