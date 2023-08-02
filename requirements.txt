@@ -4,4 +4,9 @@ python-dotenv
 pygtrie
 pandas
 numpy
-
+langchain
+tiktoken
+pinecone-client
+tqdm
+pdfplumber
+openai
