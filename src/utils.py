@@ -123,6 +123,12 @@ def write_pdf_to_pickle():
         print(f"An unexpected error occurred: {e}")
 # ========================================================================
 
+# ============================================ MISC ======================
+# returns the ith row of a dictionary
+def dict_slice(dict, i):
+    return {k: dict[k][i] for k in dict.keys()}
+    
+
     
     
 

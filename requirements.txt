@@ -6,7 +6,7 @@ pandas
 numpy
 langchain
 tiktoken
-pinecone-client
+pinecone-client[grpc]
 tqdm
 pdfplumber
 openai

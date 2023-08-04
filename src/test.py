@@ -19,4 +19,4 @@ if __name__ == "__main__":
                                  pinecone_key=PINECONE_API_KEY,
                                  pinecone_env=PINECONE_ENVIRONMENT,
                                  data = lesson_text_dict)
-    print(ra)
+    ra.add_to_index()

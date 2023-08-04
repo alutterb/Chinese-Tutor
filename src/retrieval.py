@@ -1,9 +1,8 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.openai import OpenAIEmbeddings
-
-
 from langchain.vectorstores import Pinecone
 
+from utils import dict_slice
 
 import tiktoken
 import openai 
@@ -11,6 +10,8 @@ import openai
 import pinecone
 from tqdm.auto import tqdm # smart progress bar
 from uuid import uuid4 # unique identifiers for indexing
+
+import pandas as pd
 
 class RetrievalAugmentationQA:
     def __init__(self, index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
@@ -41,7 +42,8 @@ class RetrievalAugmentationQA:
         metadatas = []
         text_splitter = self._split_text()
 
-        for i, record in enumerate(tqdm(self.data)):
+        for i, _ in enumerate(tqdm(self.data['LESSON'])): # using a column here to get length of dict, then we look at each row in the dictionary
+            record = dict_slice(self.data, i)
             # acquire metadata from record
             metadata = {
                 'PAGE': record['PAGE'],
@@ -49,7 +51,7 @@ class RetrievalAugmentationQA:
             }
 
             # create chunks from record text
-            record_texts = text_splitter.split(record['TEXT'])
+            record_texts = text_splitter.split_text(record['TEXT'])
             # create medadata dict for each chunk
             record_metadatas=[{
                 "chunk":j, "text": text, **metadata
@@ -87,7 +89,7 @@ class RetrievalAugmentationQA:
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
-            length_func=self._tiktoken_length,
+            length_function=self._tiktoken_length,
             separators=['\n\n','\n',' ', '']
         )
 
