@@ -1,17 +1,17 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains import RetrievalQA
 from langchain.vectorstores import Pinecone
 
 from utils import dict_slice
 
 import tiktoken
-import openai 
 
 import pinecone
 from tqdm.auto import tqdm # smart progress bar
 from uuid import uuid4 # unique identifiers for indexing
-
-import pandas as pd
 
 class RetrievalAugmentationQA:
     def __init__(self, index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
@@ -37,6 +37,7 @@ class RetrievalAugmentationQA:
 
         self.index = pinecone.GRPCIndex(self.index_name)
     
+    # index all text in data
     def add_to_index(self, batch_limit=100):
         texts = []
         metadatas = []
@@ -74,6 +75,30 @@ class RetrievalAugmentationQA:
             embeds = self.embed.embed_documents(texts)
             self.index.upsert(vectors=zip(ids, embeds, metadatas))
         print("All text successfully added to index.")
+
+    # create a vector store and query
+    def query(self, prompt):
+        # initialize vector store
+        text_field = "text"
+        # switch back to normal index for langchain
+        index = pinecone.Index(self.index_name)
+        vector_store = Pinecone(index,
+                                self.embed.embed_query,
+                                text_field)
+        # setup completion llm
+        llm = ChatOpenAI(
+            openai_api_key=self.openai_key,
+            model_name='gpt-3.5-turbo',
+            temperature=0.0
+        )
+
+        qa = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=vector_store.as_retriever()
+        )
+
+        return qa.run(prompt)
     
     # helper function to acquire tokenizer length
     def _tiktoken_length(self, text):

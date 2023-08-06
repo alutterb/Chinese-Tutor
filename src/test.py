@@ -20,3 +20,4 @@ if __name__ == "__main__":
                                  pinecone_env=PINECONE_ENVIRONMENT,
                                  data = lesson_text_dict)
     ra.add_to_index()
+    print(ra.query("Can you explain why nouns in Chinese are not directly countable?"))
