@@ -43,7 +43,7 @@ def correct_text(text):
     for attempt in range(1, max_attempts + 1):
         try:
             corrected_text = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=[
                     {"role" : "system", "content" : system_intel},
                     {"role" : "user", "content" : text}
@@ -122,11 +122,26 @@ def write_pdf_to_pickle():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 # ========================================================================
-
+#write_pdf_to_pickle()   
 # ============================================ MISC ======================
 # returns the ith row of a dictionary
 def dict_slice(dict, i):
     return {k: dict[k][i] for k in dict.keys()}
+
+def get_max_length_index(list_of_strings):
+    """
+    Return index of list of strings which entry is the string with maximum length
+    :param list_of_strings: list of strings
+    :return: index of list of strings which entry is the string with maximum length
+    """
+
+    max_length = 0
+    max_length_index = 0
+    for i, string in enumerate(list_of_strings):
+        if len(string) > max_length:
+            max_length = len(string)
+            max_length_index = i
+    return max_length_index
     
 
     
