@@ -6,7 +6,6 @@ from langchain.chains import RetrievalQA
 from langchain.vectorstores import Pinecone
 
 from utils import dict_slice
-from utils import get_max_length_index
 
 import tiktoken
 
@@ -22,13 +21,11 @@ class RetrievalAugmentationQA:
         self.pinecone_env = pinecone_env
         self.data = data
 
-        # acquire largest string in data
-        max_index = get_max_length_index(self.data['TEXT'])
-
         # setup OpenAI embeddings
         print("Creating OpenAI Embeddings model...")
         self.embed = OpenAIEmbeddings(model='text-embedding-ada-002')
-        self.res = self.embed.embed_documents(self.data['TEXT'][max_index])
+        self.res = self.embed.embed_documents(self.data['TEXT'][0])
+        print(f"Embedding Dimension: {len(self.res[0])}")
         # setup Pinecone index
         print("Creating Pinecone index...")
         pinecone.init(api_key=self.pinecone_key, environment=self.pinecone_env)
@@ -40,6 +37,7 @@ class RetrievalAugmentationQA:
                                 )
 
         self.index = pinecone.GRPCIndex(self.index_name)
+        print(self.index.describe_index_stats())
     
     # index all text in data
     def add_to_index(self, batch_limit=100):

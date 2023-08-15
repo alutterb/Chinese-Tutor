@@ -128,20 +128,6 @@ def write_pdf_to_pickle():
 def dict_slice(dict, i):
     return {k: dict[k][i] for k in dict.keys()}
 
-def get_max_length_index(list_of_strings):
-    """
-    Return index of list of strings which entry is the string with maximum length
-    :param list_of_strings: list of strings
-    :return: index of list of strings which entry is the string with maximum length
-    """
-
-    max_length = 0
-    max_length_index = 0
-    for i, string in enumerate(list_of_strings):
-        if len(string) > max_length:
-            max_length = len(string)
-            max_length_index = i
-    return max_length_index
     
 
     
