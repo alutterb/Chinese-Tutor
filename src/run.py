@@ -14,7 +14,7 @@ with open('Data/Textbook.pkl', 'rb') as handle:
 
 
 if __name__ == "__main__":
-    ra = RetrievalAugmentationQA(index_name='langchain-retrieval-augmentation',
+    ra = RetrievalAugmentationQA(index_name='chinese-tutor',
                                  openai_key=OPENAI_API_KEY, 
                                  pinecone_key=PINECONE_API_KEY,
                                  pinecone_env=PINECONE_ENVIRONMENT,

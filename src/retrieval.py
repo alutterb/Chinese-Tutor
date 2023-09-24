@@ -1,9 +1,14 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
+from langchain.llms import LlamaCpp
 from langchain.chains import RetrievalQAWithSourcesChain
 from langchain.chains import RetrievalQA
 from langchain.vectorstores import Pinecone
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+
+import argparse
 
 from utils import dict_slice
 
@@ -14,7 +19,7 @@ from tqdm.auto import tqdm # smart progress bar
 from uuid import uuid4 # unique identifiers for indexing
 
 class RetrievalAugmentationQA:
-    def __init__(self, index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
+    def __init__(self,index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
         self.index_name = index_name
         self.openai_key = openai_key
         self.pinecone_key = pinecone_key
@@ -79,7 +84,7 @@ class RetrievalAugmentationQA:
         print("All text successfully added to index.")
 
     # create a vector store and query
-    def query(self, prompt):
+    def query(self, prompt, llm_type='llama2'):
         # initialize vector store
         text_field = "text"
         # switch back to normal index for langchain
@@ -88,11 +93,31 @@ class RetrievalAugmentationQA:
                                 self.embed.embed_query,
                                 text_field)
         # setup completion llm
-        llm = ChatOpenAI(
-            openai_api_key=self.openai_key,
-            model_name='gpt-4',
-            temperature=0.0
-        )
+        if llm_type == "gpt-4":
+            print("GPT-4 model selected.")
+            llm = ChatOpenAI(
+                openai_api_key=self.openai_key,
+                model_name='gpt-4',
+                temperature=0.0
+            )
+        elif llm_type == "llama2":
+            print("LLAMA-2 model selected.")
+            n_gpu_layers = 50 
+            n_batch = 512  
+            callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+            # model path args
+            parser = argparse.ArgumentParser()
+            parser.add_argument("-m", "--model", type=str, default="..\models\7B\Llama-2-7B-Chat-GGML\llama-2-7b-chat.Q2_K.gguf")
+            args = parser.parse_args()
+            llm = LlamaCpp(model_path=args.model,
+                           n_gpu_layers=n_gpu_layers,
+                           n_batch=n_batch,
+                           n_ctx=2068,
+                           callback_manager=callback_manager,
+                           verbose=True)
+        else:
+            print("Invalid or Unsupported LLM type. Please choose either 'gpt-4' or 'llama2'")
+            return None
 
         qa = RetrievalQA.from_chain_type(
             llm=llm,
