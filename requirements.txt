@@ -10,3 +10,5 @@ pinecone-client[grpc]
 tqdm
 pdfplumber
 openai
+FlagEmbedding
+argparse
