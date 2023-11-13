@@ -1,7 +1,5 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.embeddings import HuggingFaceBgeEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import LlamaCpp
 from langchain.chains import RetrievalQAWithSourcesChain
@@ -10,10 +8,10 @@ from langchain.vectorstores import Pinecone
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
-
-
 import argparse
+
 from utils import dict_slice
+
 import tiktoken
 
 import pinecone
@@ -21,27 +19,16 @@ from tqdm.auto import tqdm # smart progress bar
 from uuid import uuid4 # unique identifiers for indexing
 
 class RetrievalAugmentationQA:
-    def __init__(self,index_name, openai_key, pinecone_key, pinecone_env, data, use_open_source=True) -> None:
+    def __init__(self,index_name, openai_key, pinecone_key, pinecone_env, data) -> None:
         self.index_name = index_name
         self.openai_key = openai_key
         self.pinecone_key = pinecone_key
         self.pinecone_env = pinecone_env
         self.data = data
-        self.use_open_source = use_open_source
 
-        # if use_open_source:
-        # use hf BERT
-        if self.use_open_source:
-            print("Creating HuggingFace Embeddings model...")
-            model_kwargs = {'device': 'cuda'}
-            encode_kwargs = {'normalize_embeddings': True} # set True to compute cosine similarity
-            self.embed = HuggingFaceBgeEmbeddings(model_name="BAAI/bge-large-en-v1.5",
-                                                  model_kwargs=model_kwargs,
-                                                  encode_kwargs=encode_kwargs)
         # setup OpenAI embeddings
-        else:
-            print("Creating OpenAI Embeddings model...")
-            self.embed = OpenAIEmbeddings(model='text-embedding-ada-002')
+        print("Creating OpenAI Embeddings model...")
+        self.embed = OpenAIEmbeddings(model='text-embedding-ada-002')
         self.res = self.embed.embed_documents(self.data['TEXT'][0])
         print(f"Embedding Dimension: {len(self.res[0])}")
         # setup Pinecone index
@@ -97,7 +84,7 @@ class RetrievalAugmentationQA:
         print("All text successfully added to index.")
 
     # create a vector store and query
-    def query(self, prompt):
+    def query(self, prompt, llm_type='llama2'):
         # initialize vector store
         text_field = "text"
         # switch back to normal index for langchain
@@ -106,8 +93,16 @@ class RetrievalAugmentationQA:
                                 self.embed.embed_query,
                                 text_field)
         # setup completion llm
-        if self.use_open_source:
-            n_gpu_layers = 100
+        if llm_type == "gpt-4":
+            print("GPT-4 model selected.")
+            llm = ChatOpenAI(
+                openai_api_key=self.openai_key,
+                model_name='gpt-4',
+                temperature=0.0
+            )
+        elif llm_type == "llama2":
+            print("LLAMA-2 model selected.")
+            n_gpu_layers = 50 
             n_batch = 512  
             callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
             # model path args
@@ -119,14 +114,11 @@ class RetrievalAugmentationQA:
                            n_batch=n_batch,
                            n_ctx=2068,
                            callback_manager=callback_manager,
-                           verbose=False)
+                           verbose=True)
         else:
-            llm = ChatOpenAI(
-                openai_api_key=self.openai_key,
-                model_name='gpt-4',
-                temperature=0.0
-            )
-        # setup retrieval chain
+            print("Invalid or Unsupported LLM type. Please choose either 'gpt-4' or 'llama2'")
+            return None
+
         qa = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
