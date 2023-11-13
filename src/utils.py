@@ -7,9 +7,6 @@ import openai
 from prompts import SYSTEM_INTEL
 import time
 
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
-
 # load environment variables
 load_dotenv()
 # Hyperparameters
@@ -67,44 +64,40 @@ def correct_text(text):
                 print(f"An error occurred: {e}. No more retries.")
                 raise
 
-def process_page(page, lesson_range):
-    i = page.page_number - 1
-    print(f"Processing page {i}...")
 
-    # Determine lesson
-    for lesson in lesson_range:
-        if i >= lesson['START'] and i <= lesson['END']:
-            lesson_name = lesson['LESSON']
-            break
-    else:
-        lesson_name = None
-
-    # Extract and process text
-    raw_text = page.extract_text()
-    raw_chunks = truncate_text(raw_text)
-    all_text = ''
-    for chunk in raw_chunks:
-        corrected_text = correct_text(chunk)
-        corrected_text = corrected_text['choices'][0]['message']['content']
-        all_text += corrected_text
-
-    return i, lesson_name, all_text
-
+# Converts pdf to text
 def extract_and_process_text_from_pdf(pdf_path):
-    text_dict = {'PAGE': [], 'LESSON': [], 'TEXT': []}
-
+    text_dict = {}
+    lesson_list = []
+    page_list = []
+    text_list = []
     with pdfplumber.open(pdf_path) as pdf:
-        with ThreadPoolExecutor() as executor:
-            # Map the process_page function to all pages
-            futures = [executor.submit(process_page, page, LESSONS) for page in pdf.pages]
-
-            for future in concurrent.futures.as_completed(futures):
-                page_num, lesson_name, text = future.result()
-                text_dict['PAGE'].append(page_num)
-                text_dict['LESSON'].append(lesson_name)
-                text_dict['TEXT'].append(text)
-
+        for i, page in enumerate(pdf.pages):
+            print(f"Processing page {i}...")
+            # record page number
+            page_list.append(i)
+            # identify which lesson this page belongs to
+            for lesson in LESSONS:
+                if i >= lesson['START'] and i <= lesson['END']:
+                    lesson_list.append(lesson['LESSON'])
+                    break
+                
+            # extract raw text from pdf
+            raw_text = page.extract_text()
+            # break up input into chunks up to MAX_TOKENS
+            raw_chunks = truncate_text(raw_text)
+            # loop through chunks and apply openai api to correct text
+            all_text = ''
+            for chunk in raw_chunks:
+                corrected_text = correct_text(chunk)
+                # acquire text from openai result
+                corrected_text = corrected_text['choices'][0]['message']['content']
+                all_text += corrected_text
+            text_list.append(all_text)
     print("Text from pdf successfully extracted and corrected.")
+    text_dict['PAGE'] = page_list
+    text_dict['LESSON'] = lesson_list
+    text_dict['TEXT'] = text_list
     return text_dict
 
 # Do everything
@@ -130,8 +123,6 @@ def write_pdf_to_pickle():
         print(f"An unexpected error occurred: {e}")
 # ========================================================================
 #write_pdf_to_pickle()   
-
-
 # ============================================ MISC ======================
 # returns the ith row of a dictionary
 def dict_slice(dict, i):
